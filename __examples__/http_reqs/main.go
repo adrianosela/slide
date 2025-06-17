@@ -1,13 +1,3 @@
-# slide
-
-Sliding window session management for Go
-
-
-### Example Usage
-
-> An HTTP server grouping requests into sessions (deduplicating by source IP).
-
-```
 package main
 
 import (
@@ -23,6 +13,13 @@ import (
 	"github.com/adrianosela/slide"
 )
 
+const (
+	janitorInterval = time.Second * 2
+	idleTimeout     = time.Second * 5
+
+	listenAddr = ":8008"
+)
+
 type session struct {
 	id       string
 	sourceIP string
@@ -35,13 +32,19 @@ func main() {
 
 	tracker := slide.NewTracker[*session](
 		getSessionInitFunc(sessions),
-		slide.WithJanitorInterval[*session](time.Second*2),
-		slide.WithInactivityTimeout[*session](time.Second*5),
+		slide.WithJanitorInterval[*session](janitorInterval),
+		slide.WithInactivityTimeout[*session](idleTimeout),
 		slide.WithOnSessionEnd(getOnSessionEnd(sessions)),
 	)
 	defer tracker.Stop()
 
-	http.ListenAndServe(":8008", getHandler(tracker))
+	log.Printf(
+		"Listening on %s. Janitor interval is %s. Idle timeout is %s.",
+		listenAddr,
+		janitorInterval.String(),
+		idleTimeout.String(),
+	)
+	http.ListenAndServe(listenAddr, getHandler(tracker))
 }
 
 func getSessionInitFunc(sessions map[string]*session) slide.SessionInitFunc[*session] {
@@ -89,4 +92,3 @@ func freshID() string {
 	_, _ = rand.Read(buf)
 	return hex.EncodeToString(buf)
 }
-```
